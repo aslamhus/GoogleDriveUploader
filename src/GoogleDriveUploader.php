@@ -1,13 +1,16 @@
 <?php
 
+namespace Aslamhus\GoogleDrive;
 
 use Google\Client;
 use Google\Service\Drive;
+use Google\Service\Drive\DriveFile;
 use Google\Http\MediaFileUpload;
 
 /**
  * Google Drive Uploader
  *
+ * by @aslamhus on github
  *
  * ## Dependencies
  *
@@ -27,31 +30,31 @@ use Google\Http\MediaFileUpload;
  * You need a Google Cloud Console service account and credentials see (<https://developers.google.com/workspace/guides/create-project>)
  *
  * 1. create a google cloud project:
- *  go to page-> <https://console.cloud.google.com/projectcreate>
+ * go to page-> <https://console.cloud.google.com/projectcreate>
  *
- *  2. enable google api you want to use
- *  In the Google Cloud console, go to Menu menu > More products > Google Workspace > Product Library.
+ * 2. enable google api you want to use
+ * In the Google Cloud console, go to Menu menu > More products > Google Workspace > Product Library.
  *
  * 3. set up Oauth for your app
  *  under Apis and services, go to OAuth consent screen and follow instructions
  *
  * 4. choose scopes, for Google Drive API see scopes here: <https://developers.google.com/drive/api/guides/api-specific-auth>
  *
- * 5.  create access credentials (api key)
+ * 5. create access credentials (api key)
  * In the Google Cloud console, go to Menu menu > APIs & Services > Credentials.
  *  click create credentails -> api key
  * Copy it and add it to your config file / env file
  *
  * 6. create access credentails (Oauth client id)
- *  click create crednetials -> oauth client id
- *  add the authorized urlis (authorized javascript origins/redirect urls)
+ * click create crednetials -> oauth client id
+ * add the authorized urlis (authorized javascript origins/redirect urls)
  * Download the client secret json file
  *
  * _NOTE: you must also download the service account secret. Go tot service accounts -> keys -> create key_
  *
  * 7. create service account
- *  In the Google Cloud console, go to Menu menu > IAM & Admin > Service Accounts.
- *  click create service account
+ * In the Google Cloud console, go to Menu menu > IAM & Admin > Service Accounts.
+ * click create service account
  *
  * 8. add service account to google drive folder (give permissions to the service account email)
  * Use the folder id of the folder you want to upload to
@@ -75,11 +78,11 @@ use Google\Http\MediaFileUpload;
  * // init the uploader and get the resume uri
  * $resumeUri = $uploader->initResumable($fileName, $mimeType);
  * // upload file
- * $uploader->uploadResumable($filePath, $mimeType);
+ * $uploader->startResumable($filePath, $mimeType);
  *
  *
  * ### Asynchronous Resumable upload
- * By default, the uploadResumable() method is synchronous and will return the final response from the google drive api
+ * By default, the startResumable() method is synchronous and will return the final response from the google drive api
  * However, you can set the async flag to true to make it asynchronous
  *
  * @example
@@ -87,7 +90,7 @@ use Google\Http\MediaFileUpload;
  * // init the uploader and get the resume uri
  * $resumeUri = $uploader->initResumable($fileName, $mimeType);
  * // upload file asynchronously by setting the async flag to true
- * $asyncTask = $uploader->uploadResumable($filePath, $mimeType, true);
+ * $asyncTask = $uploader->startResumable($filePath, $mimeType, true);
  * foreach($asyncTask as $response) {
  *      // continue any other logic
  *      // $response will return false until the upload is complete
@@ -104,14 +107,14 @@ use Google\Http\MediaFileUpload;
  * // Note: The resume URI is stored after initResumable(), and can be accessed with getResumeUri() after resumableUpload() is called
  * $uploader = new DriveUploader($driveFolderId);
  * $resumeUri = $uploader->initResumable($fileName, $mimeType);
- * $uploader->uploadResumable($filePath, $mimeType);
+ * $uploader->startResumable($filePath, $mimeType);
  * // at this point, if the upload is interrupted, you can resume it with the resume() method
- * $uploader->resume($resumeUri, $filePath, $mimeType);
+ * $uploader->resume($resumeUri);
  *
  *
  */
 
-class DriveUploader
+class GoogleDriveUploader
 {
     private Client $client;
     private Drive $driveService;
@@ -122,6 +125,12 @@ class DriveUploader
     private const CHUNK_SIZE = 262144;
     private bool $shouldAbort = false;
 
+    /**
+     * Constructor
+     *
+     * @param string $driveFolderId
+     * @param [int] $chunkSize - the chunk size for chunk uploads, defaults to Google recommended chunk size 262144
+     */
     public function __construct(string $driveFolderId, int $chunkSize = self::CHUNK_SIZE)
     {
         $this->driveFolderId = $driveFolderId;
@@ -177,11 +186,11 @@ class DriveUploader
      * Create drive file with parent folder id
      *
      * @param string $fileName
-     * @return Drive\DriveFile
+     * @return DriveFile
      */
-    private function createDriveFile(string $fileName): Drive\DriveFile
+    private function createDriveFile(string $fileName): DriveFile
     {
-        $fileMetadata = new Drive\DriveFile([
+        $fileMetadata = new DriveFile([
             'name' => $fileName,
             'parents' => [ $this->driveFolderId ]
         ]);
@@ -195,7 +204,7 @@ class DriveUploader
      * @param string $fileName - the name that will be given to the file in google drive
      * @param string $mimeType - the mimetype of the file, i.e. image/jpeg | audio/mp3
      * @param string $uploadType - multipart|media|resumable @see https://developers.google.com/drive/api/guides/manage-uploads
-     * @return Drive\DriveFile
+     * @return DriveFile
      */
     public function uploadBasic(string $filePath, string $fileName, string $mimeType, string $uploadType = 'multipart'): Drive\DriveFile
     {
@@ -225,7 +234,7 @@ class DriveUploader
     /**
      * Init resumable upload
      *
-     * Must be called before uploadResumable()
+     * Must be called before startResumable()
      *
      * @param string $fileName - the name that will be given to the file in google drive
      * @param string $mimeType - the mimetype of the file, i.e. image/jpeg | audio/mp3
@@ -263,15 +272,15 @@ class DriveUploader
      * // Note: The resume URI is stored after initResumable(), and can be accessed with getResumeUri() after resumableUpload() is called
      * $uploader = new DriveUploader($driveFolderId);
      * $resumeUri = $uploader->initResumable($fileName, $mimeType);
-     * $uploader->uploadResumable($filePath, $mimeType);
+     * $uploader->startResumable($filePath, $mimeType);
      *
      * // at this point, if the upload is interrupted, you can resume it with the resume() method
-     * $uploader->resume($resumeUri, $filePath, $mimeType);
+     * $uploader->resume($resumeUri);
      *
      *
      *
      * @param string $filePath - the path to the file to upload
-     * @param callable $onChunkRead - a callback function that will be called on each chunk read
+     * @param ?callable $onChunkRead - a callback function that will be called on each chunk read
      * @param int [$bytesPointer] - the byte range to start from
      * @param boolean [$async] - whether to upload asynchronously
      *
@@ -279,18 +288,18 @@ class DriveUploader
      * a generator is returned which yields false for incomplete uploads and the DriveFile object for complete uploads
      * If async is set to false, the final response is returned
      */
-    public function uploadResumable(string $filePath, callable $onChunkRead, $async = false): mixed
+    public function startResumable(string $filePath, callable $onChunkRead = null, $async = false): mixed
     {
 
         // check that initResumable() has been called
         if(!$this->resumeUri || !$this->media) {
-            throw new GoogleDriveUploaderException('initResumable() must be called before uploadResumable()');
+            throw new GoogleDriveUploaderException('initResumable() must be called before startResumable()');
         }
 
         try {
             // validate file path
             if(!$filePath || !is_file($filePath)) {
-                throw new \Exception('Invalid file path:' . $filePath);
+                throw new GoogleDriveUploaderException('Invalid file path:' . $filePath);
             }
             // set the overall file size
             $fileSize = filesize($filePath);
@@ -298,10 +307,10 @@ class DriveUploader
 
             // If async flag is true, return the generator
             if ($async) {
-                return $this->uploadResumableAsync($filePath, $fileSize, $onChunkRead);
+                return $this->startResumableAsync($filePath, $fileSize, $onChunkRead);
             }
 
-            // if async is set to false, return the final response
+            // if async flag is false, return the final response
             $response = false;
             foreach($this->readChunks($filePath, $fileSize, $onChunkRead) as $chunkArgs) {
                 $response =  $this->media->nextChunk($chunkArgs[0]);
@@ -319,14 +328,14 @@ class DriveUploader
     /**
      * Upload resumable async
      *
-     * used by uploadResumable() when the async flag is set to true
+     * used by startResumable() when the async flag is set to true
      *
      * @param string $filePath
      * @param integer $fileSize
      * @param callable $onChunkRead
      * @return Generator<DriveFile|false> - yields false for incomplete uploads and the DriveFile object for complete uploads
      */
-    private function uploadResumableAsync(string $filePath, int $fileSize, callable $onChunkRead)
+    private function startResumableAsync(string $filePath, int $fileSize, callable $onChunkRead)
     {
         $asyncTask =  $this->readChunks($filePath, $fileSize, $onChunkRead);
         foreach($asyncTask as $chunkArgs) {
@@ -341,12 +350,12 @@ class DriveUploader
      *
      * @param string $filePath
      * @param integer $fileSize
-     * @param callable $onChunkRead
+     * @param ?callable $onChunkRead - callback with arguments: chunk, progress, filesize, byte range
      * @param integer $bytesPointer
      *
      * @return Generator<array> - yields the chunk, progress, filesize and byte range
      */
-    private function readChunks(string $filePath, int $fileSize, callable $onChunkRead, int $bytesPointer = 0)
+    private function readChunks(string $filePath, int $fileSize, ?callable $onChunkRead, int $bytesPointer = 0)
     {
 
         // reset abort flag
@@ -365,18 +374,19 @@ class DriveUploader
             // get the number of bytes processed
             $bytesProcessed = ftell($handle);
             // calculate progress as percentage
-            $progress = ceil($bytesProcessed  / $fileSize * 100);
+            $progress = number_format(($bytesProcessed  / $fileSize * 100), 2, '.', '');
             // get byte range:
             // [start, end -1] (because zero indexed)
             $byteRange = [$bytesProcessed - strlen($chunk), $bytesProcessed - 1];
-            // fire onChunkRead callback if it exists
-            if($onChunkRead) {
-                $args = [$chunk,  $progress, $fileSize, $byteRange];
-                // fire the onChunkRead callback
+            // set the arguments to pass to the onChunkRead callback
+            $args = [$chunk,  $progress, $fileSize, $byteRange];
+            // fire the onChunkRead callback
+            if(is_callable($onChunkRead)) {
                 call_user_func($onChunkRead, ...$args);
-                // yield the chunk,  progress, filesize and byte range
-                yield $args;
             }
+            // yield the chunk arguments
+            yield $args;
+
 
             $countChunks++;
         }
@@ -388,37 +398,35 @@ class DriveUploader
 
 
     /**
-     * Resume upload
-     *
-     * Resumes an interrupted upload
-     *
-     * By default, the resume() method is synchronous and will return the final response from the google drive api
-     * However, you can set the async flag to true to make it asynchronous
-     *
-     * 1. query the resumable uri
-     *
-     * 2. if the response is 308, then the upload is incomplete and we can resume.
-     * The response will contain a range header that indicates the byte range that has been uploaded
-     * We can use this to determine where to resume the upload.
-     * We then call putRemainingChunks() to upload the remaining chunks.
-     *
-     * 3. if the response is 200, then the upload is complete and we return true.
-     *
-     * 4. for any other response the upload has either not started, failed or the resume uri
-     * has expired. In these cases an exception is thrown and you must restart
-     *
-     *
-     * @param string $resumeUri
-     * @param string $filePath - the path to the file to upload
-     * @param string $fileName - the name that will be given to the file in google drive
-     * @param string $mimeType
-     * @param callable $onChunkRead - a callback function that will be called on each chunk read
-     * @param boolean $async - whether to upload asynchronously
-     * @return  Generator<DriveFile|false> - yields false for incomplete uploads and the DriveFile object for complete uploads
-     *
-     * @throws GoogleDriveUploaderException
-     */
-    public function resume(string $resumeUri, string $filePath, $fileName, string $mimeType, callable $onChunkRead = null, bool $async = false)
+      * Resume upload
+      *
+      * Resumes an interrupted upload
+      *
+      * By default, the resume() method is synchronous and will return the final response from the google drive api
+      * However, you can set the async flag to true to make it asynchronous
+      *
+      * 1. query the resumable uri
+      *
+      * 2. if the response is 308, then the upload is incomplete and we can resume.
+      * The response will contain a range header that indicates the byte range that has been uploaded
+      * We can use this to determine where to resume the upload.
+      * We then call putRemainingChunks() to upload the remaining chunks.
+      *
+      * 3. if the response is 200, then the upload is complete and we return true.
+      *
+      * 4. for any other response the upload has either not started, failed or the resume uri
+      * has expired. In these cases an exception is thrown and you must restart
+      *
+      *
+      * @param string $resumeUri
+      * @param string $filePath - the path to the file to upload
+      * @param callable [$onChunkRead]- a callback function that will be called on each chunk read
+      * @param boolean [$async] - whether to upload asynchronously
+      * @return  Generator<DriveFile|false> - yields false for incomplete uploads and the DriveFile object for complete uploads
+      *
+      * @throws GoogleDriveUploaderException
+      */
+    public function resume(string $resumeUri, string $filePath, callable $onChunkRead = null, bool $async = false)
     {
         $response = false;
         // perform a curl PUT request to the resume uri
@@ -448,7 +456,7 @@ class DriveUploader
             case 500:
             case 503:
                 // upload did not start, failed or resume uri expired, you must restart
-                throw new \Exception('Upload has not started, you must restart. Http status: ' . $status);
+                throw new GoogleDriveUploaderException('Upload has not started, you must restart. Http status: ' . $status);
 
 
         }
@@ -468,10 +476,10 @@ class DriveUploader
      *
      * $uploader = new DriveUploader($driveFolderId);
      * $resumeUri = $uploader->initResumable($fileName, $mimeType);
-     * $asyncTask = $uploader->uploadResumable($filePath, $mimeType);
+     * $asyncTask = $uploader->startResumable($filePath, $mimeType);
      * foreach($asyncTask as $response) {
      *     // cancel upload after some event
-     *    if($myEvent === true) {
+     *    if($myInterruptingEvent === true) {
      *       $uploader->abort();
      *   }
      * }
@@ -513,8 +521,7 @@ class DriveUploader
 
         // if async is set to false, return the final response
         $response = null;
-        $asyncTask =  $this->readChunks($filePath, $fileSize, $onChunkRead, $bytesPointer);
-        foreach($asyncTask as $chunkArgs) {
+        foreach($this->readChunks($filePath, $fileSize, $onChunkRead, $bytesPointer) as $chunkArgs) {
             $response =  $this->processRemainingChunk($resumeUri, $chunkArgs, $onChunkRead, $status);
         }
 
@@ -532,7 +539,7 @@ class DriveUploader
      * @param integer $fileSize
      * @param integer $bytesPointer
      * @param callable $onChunkRead
-     * @param [type] $status
+     * @param integer $status
      * @return void
      */
     private function putRemainingChunksAsync(string $resumeUri, string $filePath, int $fileSize, int $bytesPointer, callable $onChunkRead, &$status)
@@ -553,7 +560,7 @@ class DriveUploader
      * @param string $resumeUri
      * @param array $chunkArgs
      * @param callable $onChunkRead
-     * @param [type] $status
+     * @param integer $status
      *
      * @return Drive\DriveFile|false
      */
@@ -579,16 +586,23 @@ class DriveUploader
      * Parse chunk response to DriveFile object or false
      *
      * @param mixed $response
-     * @return Drive\DriveFile|false
+     * @return DriveFile|false
      */
     private function parseChunkResponse($response)
     {
-        $json = json_decode($response, true);
+        $response =  json_decode($response, true);
         // if the response contains an id, instantiate a DriveFile object
-        if($json && isset($json['id'])) {
-            $json = new Drive\DriveFile($response);
+        if($response && isset($response['id'])) {
+            // instantiate a DriveFile object and set properties
+            // Note: setting the properties individually was necessary to avoid a bug where DriveFile did not read associative array properties
+            $driveFile = new DriveFile($response);
+            $driveFile->setDriveId($response['id']);
+            $driveFile->setName($response['name'] ?? '');
+            $driveFile->setMimeType($response['mimeType'] ?? '');
+            $driveFile->setKind($response['kind'] ?? '');
+            $response = $driveFile;
         }
-        return $json;
+        return $response;
     }
 
     /**
@@ -600,10 +614,10 @@ class DriveUploader
      *
      * @see https://developers.google.com/drive/api/v3/manage-uploads#resume-upload
      *
-     * From Google: Now that you know where to resume the upload,
+     * From Google: "Now that you know where to resume the upload,
      * continue to upload the file beginning with the next byte.
      * Include a Content-Range header to indicate which portion of the file you send.
-     * For example, Content-Range: bytes 43-1999999 indicates that you send bytes 44 through 2,000,000.
+     * For example, Content-Range: bytes 43-1999999 indicates that you send bytes 44 through 2,000,000."
      *
      * @return void
      */
@@ -633,7 +647,7 @@ class DriveUploader
         $output = curl_exec($cH);
         if($output === false) {
             $error = curl_error($cH);
-            throw new \Exception($error);
+            throw new GoogleDriveUploaderException($error);
         }
         $status = curl_getinfo($cH, CURLINFO_HTTP_CODE);
         curl_close($cH);
@@ -645,7 +659,7 @@ class DriveUploader
     /**
      * Query resumable uri
      *
-     * Perform a curl PUT request to the resume uri in order
+     * Perform a cURL PUT request to the resume uri in order
      * to determine the status of the interrupted upload
      *
      * 1. create an empty PUT request to the resumable session URI
@@ -710,7 +724,7 @@ class GoogleDriveUploaderException extends \Exception
 {
     public function __construct(string $message, int $code = 0, \Throwable $previous = null)
     {
-        $message = "GoogleDriveUploaderException: $message";
+        $message = self::class . ": $message";
         parent::__construct($message, $code, $previous);
 
     }

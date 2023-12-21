@@ -1,1 +1,4 @@
 .DS_Store
+/vendor/
+.env
+straight-no-chaser-407723-e24f653ef7e5.json

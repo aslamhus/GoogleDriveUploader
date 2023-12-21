@@ -33,31 +33,41 @@ To use the LogsheetReader Google Drive Uploader, you need to set up a Google Clo
 8. Create a service account: Navigate to IAM & Admin > Service Accounts, then click "Create Service Account."
 9. Add the service account to the Google Drive folder by granting permissions to the service account email.
 
-You're now ready to use the LogsheetReader Google Drive Uploader!
+You're now ready to use the Google Drive Uploader!
 
 ## Usage
+
+### Setup
+
+`Aslamhus\GoogleDrive\Uploader` sets default credentials via environment variables. You must set the environment variable like so:
+
+```php
+putenv('GOOGLE_APPLICATION_CREDENTIALS=<path-to-service-account-credentials-json-file>');
+```
 
 ### Basic Upload
 
 ```php
-$uploader = new DriveUploader($driveFolderId);
+use Aslamhus\GoogleDrive\GoogleDriveUploader;
+$uploader = new GoogleDriveUploader($driveFolderId);
 $file = $uploader->uploadBasic($filePath, $fileName, $mimeType);
 ```
 
 ### Resumable Upload
 
 ```php
-$uploader = new DriveUploader($driveFolderId);
+$uploader = new GoogleDriveUploader($driveFolderId);
 $resumeUri = $uploader->initResumable($fileName, $mimeType);
-$uploader->uploadResumable($filePath, $mimeType);
+$uploader->startResumable($filePath);
 ```
 
 ### Asynchronous Resumable Upload
 
 ```php
-$uploader = new DriveUploader($driveFolderId);
+$uploader = new GoogleDriveUploader($driveFolderId);
 $resumeUri = $uploader->initResumable($fileName, $mimeType);
-$asyncTask = $uploader->uploadResumable($filePath, $mimeType, true);
+// the second argument to upload resumable is the optional onChunkRead callback
+$asyncTask = $uploader->startResumable($filePath, null, true);
 
 foreach ($asyncTask as $response) {
     // Continue any other logic
@@ -72,12 +82,34 @@ $fileId = $response['id'];
 ### Resume an Interrupted Upload
 
 ```php
-$uploader = new DriveUploader($driveFolderId);
+$uploader = new GoogleDriveUploader($driveFolderId);
+// init and store the resumable uri
 $resumeUri = $uploader->initResumable($fileName, $mimeType);
-$uploader->uploadResumable($filePath, $mimeType);
+$uploader->startResumable($filePath);
+// If the upload is interrupted, resume it with the resume() method passing the resumeUri argument
+$uploader->resume($resumeUri);
+```
 
-// If the upload is interrupted, resume it with the resume() method
-$uploader->resume($resumeUri, $filePath, $mimeType);
+## Callbacks
+
+### onChunkRead
+
+You can pass an optional `onChunkRead` callback method to `startResumable` and `resume`.
+
+```php
+/**
+ * On chunk read
+ *
+ * @param string $chunk - the chunk byte string
+ * @param int $progress - the progress percentage, e.g. 10.00
+ * @param int $fileSize - the file size in bytes
+ * @param arary $byteRange - the range of bytes read [from, to], i.e. [0, 256000]
+ **/
+$onChunkRead = function($chunk,  $progress, $fileSize, $byteRange) {
+    // do something like outputting the progress
+    echo $progress . "%";
+}
+$uploader->startResumable($filePath, $onChunkRead);
 ```
 
 ## Exception Handling
