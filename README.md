@@ -1,63 +1,89 @@
-# GoogleDriveUploader
+# Google Drive Uploader
 
-A PHP class for uploading files to Google Drive, providing methods for basic and resumable uploads, with support for managing dependencies and setting up Google Drive API service accounts
-
-## Usage
-
-```php
-$uploader = new DriveUploader($driveFolderId);
-// basic upload
-$uploader->uploadBasic($filePath, $fileName, $mimeType);
-// resumable upload
-$resumeSessionUri = $uploader->initResumable($fileName, $mimeType);
-// where onChunkRead is a callback method with progress information
-$uploader->uploadResumable($filePath, $onChunkRead);
-```
+The LogsheetReader Google Drive Uploader is a PHP class that facilitates uploading files to Google Drive using the Google Drive API. It supports both basic and resumable uploads, allowing you to efficiently upload large files in chunks. You
 
 ## Dependencies
 
-Requires a google service account with the google drive api enabled
+This class relies on the Google API PHP client library and requires a Google service account with the Google Drive API enabled. Please refer to the following resources for additional information and setup instructions:
 
-@see <https://developers.google.com/drive/api/v3/quickstart/php>
-@see <https://developers.google.com/drive/api/v3/manage-uploads>
-@see <https://github.com/googleapis/google-api-php-client/blob/main/examples/large-file-upload.php>
+- [Google Drive API Quickstart for PHP](https://developers.google.com/drive/api/v3/quickstart/php)
+- [Google Drive API Managing Uploads](https://developers.google.com/drive/api/v3/manage-uploads)
+- [Google API PHP Client GitHub Repository](https://github.com/googleapis/google-api-php-client/blob/main/examples/large-file-upload.php)
 
-## Composer dependencies
+## Composer Dependencies
 
-run composer require google/apiclient
+To install the required dependencies, run the following Composer command:
 
-## Instructions to set up Google Drive API service account
+```bash
+composer require google/apiclient
+```
 
-You need a Google Cloud Console service account and credentials see (<https://developers.google.com/workspace/guides/create-project>)
+## Setting up Google Drive API Service Account
 
-1. create a google cloud project:
-   go to page-> <https://console.cloud.google.com/projectcreate>
+To use the LogsheetReader Google Drive Uploader, you need to set up a Google Cloud Console service account and obtain the necessary credentials. Follow these steps:
 
-2. enable google api you want to use
-   In the Google Cloud console, go to Menu menu > More products > Google Workspace > Product Library.
+1. Create a Google Cloud project: [Google Cloud Console](https://console.cloud.google.com/projectcreate)
+2. Enable the Google Drive API: [Google Workspace Product Library](https://console.cloud.google.com/marketplace/product/google/drive.googleapis.com)
+3. Set up OAuth for your app: Navigate to APIs and services > OAuth consent screen.
+4. Choose scopes: Select the required scopes for Google Drive API. See available scopes [here](https://developers.google.com/drive/api/guides/api-specific-auth).
+5. Create access credentials (API key): Navigate to APIs & Services > Credentials, then click "Create Credentials" > "API key."
+6. Create access credentials (OAuth client ID): Navigate to APIs & Services > Credentials, then click "Create Credentials" > "OAuth client ID." Add authorized URLs and download the client secret JSON file.
+7. Download the service account secret: Navigate to Service accounts > Keys > Create key.
 
-3. set up Oauth for your app
-   under Apis and services, go to OAuth consent screen and follow instructions
+8. Create a service account: Navigate to IAM & Admin > Service Accounts, then click "Create Service Account."
+9. Add the service account to the Google Drive folder by granting permissions to the service account email.
 
-4. choose scopes, for Google Drive API see scopes here: <https://developers.google.com/drive/api/guides/api-specific-auth>
+You're now ready to use the LogsheetReader Google Drive Uploader!
 
-5. create access credentials (api key)
-   In the Google Cloud console, go to Menu menu > APIs & Services > Credentials.
-   click create credentails -> api key
-   Copy it and add it to your config file / env file
+## Usage
 
-6. create access credentails (Oauth client id)
-   click create crednetials -> oauth client id
-   add the authorized urlis (authorized javascript origins/redirect urls)
-   Download the client secret json file
+### Basic Upload
 
-_NOTE: you must also download the service account secret. Go tot service accounts -> keys -> create key_
+```php
+$uploader = new DriveUploader($driveFolderId);
+$file = $uploader->uploadBasic($filePath, $fileName, $mimeType);
+```
 
-7. create service account
-   In the Google Cloud console, go to Menu menu > IAM & Admin > Service Accounts.
-   click create service account
+### Resumable Upload
 
-8. add service account to google drive folder (give permissions to the service account email)
-   Use the folder id of the folder you want to upload to
+```php
+$uploader = new DriveUploader($driveFolderId);
+$resumeUri = $uploader->initResumable($fileName, $mimeType);
+$uploader->uploadResumable($filePath, $mimeType);
+```
 
-You're done!
+### Asynchronous Resumable Upload
+
+```php
+$uploader = new DriveUploader($driveFolderId);
+$resumeUri = $uploader->initResumable($fileName, $mimeType);
+$asyncTask = $uploader->uploadResumable($filePath, $mimeType, true);
+
+foreach ($asyncTask as $response) {
+    // Continue any other logic
+    // $response will return false until the upload is complete
+    // You can abort the upload at any time by calling $uploader->abort()
+}
+
+// Once the upload is complete, $response will contain a Google Drive File object
+$fileId = $response['id'];
+```
+
+### Resume an Interrupted Upload
+
+```php
+$uploader = new DriveUploader($driveFolderId);
+$resumeUri = $uploader->initResumable($fileName, $mimeType);
+$uploader->uploadResumable($filePath, $mimeType);
+
+// If the upload is interrupted, resume it with the resume() method
+$uploader->resume($resumeUri, $filePath, $mimeType);
+```
+
+## Exception Handling
+
+The class includes a custom exception class, `GoogleDriveUploaderException`, to handle errors in the Google Drive uploading process.
+
+Feel free to contribute or report issues on [GitHub](https://github.com/aslamhus/GoogleDriveUploader).
+
+Happy uploading!
