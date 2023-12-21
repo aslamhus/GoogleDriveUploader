@@ -142,3 +142,15 @@ The class includes a custom exception class, `GoogleDriveUploaderException`, to 
 Feel free to contribute or report issues on [GitHub](https://github.com/aslamhus/GoogleDriveUploader).
 
 Happy uploading!
+
+## Testing
+
+Before testing, make sure you've installed dev dependencies, and set up your .env file with the `GOOGLE_APPLICATION_CREDENTIALS` and `GOOGLE_DRIVE_FOLDER_ID`.
+
+_Note: running the tests will upload 3 small test videos to your good drive folder with the id you specify_
+
+Then run:
+
+```bash
+composer run-script test
+```
