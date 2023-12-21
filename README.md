@@ -37,15 +37,29 @@ You're now ready to use the Google Drive Uploader!
 
 ## Usage
 
-### Setup
+### Config
 
-`Aslamhus\GoogleDrive\Uploader` sets default credentials via environment variables. You must set the environment variable like so:
+Before you begin uploading you must set your `GOOGLE_APPLICATION_CREDENTIALS` environment variable and create a drive folder with shared permissions granted to your service account email. Make sure you've followed the steps above if you haven't already got a service account in Google Cloud Console.
+
+1. Service account credentials
+
+`GoogleDriveUploader` sets default credentials via environment variables like so:
 
 ```php
 putenv('GOOGLE_APPLICATION_CREDENTIALS=<path-to-service-account-credentials-json-file>');
 ```
 
+2. Drive folder id
+
+In order to upload a file to a Google Drive account,
+create a folder in your desired google drive account where you'd like uploads to be sent and grant your service account email address shared permissions.
+
+Once you've done this, simply copy the drive folder id from the drive folder url. It will look something like
+"https://drive.google.com/drive/folders/<long-id-string>"
+
 ### Basic Upload
+
+Use this method for small files.
 
 ```php
 use Aslamhus\GoogleDrive\GoogleDriveUploader;
@@ -54,6 +68,9 @@ $file = $uploader->uploadBasic($filePath, $fileName, $mimeType);
 ```
 
 ### Resumable Upload
+
+Use this method for large uploads and/or when the upload
+process has a high chance of being interrupted.
 
 ```php
 $uploader = new GoogleDriveUploader($driveFolderId);
@@ -111,6 +128,12 @@ $onChunkRead = function($chunk,  $progress, $fileSize, $byteRange) {
 }
 $uploader->startResumable($filePath, $onChunkRead);
 ```
+
+## Memory Limits
+
+The `basicUpload` method loads the file into memory using `file_get_contents`, so it's best not to use large files with this method. If you do, you may run into memory limit errors.
+
+The resumable upload methods upload via chunks that are by default `262144 bytes`. You should be able to upload very large files without encountering any memory limits.
 
 ## Exception Handling
 
