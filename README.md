@@ -50,10 +50,11 @@ putenv('GOOGLE_APPLICATION_CREDENTIALS=<path-to-service-account-credentials-json
 2. Drive folder id
 
 In order to upload a file to a Google Drive account,
-create a folder in your desired google drive account where you'd like uploads to be sent and grant your service account email address shared permissions.
+create a folder in your desired google drive account where you'd like your uploads to be delivered. Then grant your service account email address access to the folder. You can find your service account email in Google Cloud Console.
 
-Once you've done this, simply copy the drive folder id from the drive folder url. It will look something like
-"https://drive.google.com/drive/folders/<long-id-string>"
+Once you've done this, simply copy the drive folder id from the drive folder url. You can find the drive folder url by navigating to the appropriate folder in Google Drive and then copying the id string from url:
+
+`https://drive.google.com/drive/folders/file-id-string`
 
 ### Basic Upload
 
@@ -131,15 +132,11 @@ $uploader->startResumable($filePath, $onChunkRead);
 
 The `basicUpload` method loads the file into memory using `file_get_contents`, so it's best not to use large files with this method. If you do, you may run into memory limit errors.
 
-The resumable upload methods upload via chunks that are by default `262144 bytes`. You should be able to upload very large files without encountering any memory limits.
+The resumable upload is performed by splitting the file into chunks which are by default `262144 bytes`. This is the Google recommended chunk size. You should be able to upload very large files without encountering any memory limits.
 
 ## Exception Handling
 
 The class includes a custom exception class, `GoogleDriveUploaderException`, to handle errors in the Google Drive uploading process.
-
-Feel free to contribute or report issues on [GitHub](https://github.com/aslamhus/GoogleDriveUploader).
-
-Happy uploading!
 
 ## Testing
 
@@ -152,3 +149,7 @@ Then run:
 ```bash
 composer run-script test
 ```
+
+Feel free to contribute or report issues on [GitHub](https://github.com/aslamhus/GoogleDriveUploader).
+
+Happy uploading!
