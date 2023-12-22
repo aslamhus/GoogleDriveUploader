@@ -10,14 +10,6 @@ This class relies on the Google API PHP client library and requires a Google ser
 - [Google Drive API Managing Uploads](https://developers.google.com/drive/api/v3/manage-uploads)
 - [Google API PHP Client GitHub Repository](https://github.com/googleapis/google-api-php-client/blob/main/examples/large-file-upload.php)
 
-## Composer Dependencies
-
-To install the required dependencies, run the following Composer command:
-
-```bash
-composer require google/apiclient
-```
-
 ## Setting up Google Drive API Service Account
 
 To use the LogsheetReader Google Drive Uploader, you need to set up a Google Cloud Console service account and obtain the necessary credentials. Follow these steps:
@@ -36,6 +28,12 @@ To use the LogsheetReader Google Drive Uploader, you need to set up a Google Clo
 You're now ready to use the Google Drive Uploader!
 
 ## Usage
+
+### Install
+
+```bash
+composer require aslamhus/google-drive-uploader
+```
 
 ### Config
 

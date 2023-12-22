@@ -641,7 +641,6 @@ class GoogleDriveUploader
             ),
             CURLOPT_POSTFIELDS => $chunk
         ];
-        // file_put_contents(__DIR__ . '/chunk.txt', $chunk);
         curl_setopt_array($cH, $options);
         // execute
         $output = curl_exec($cH);
