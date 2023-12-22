@@ -1,8 +1,8 @@
 # Google Drive Uploader
 
-The LogsheetReader Google Drive Uploader is a PHP class that facilitates uploading files to Google Drive using the Google Drive API. It supports both basic and resumable uploads, allowing you to efficiently upload large files in chunks. You
+The Google Drive Uploader is a PHP class that facilitates uploading files to Google Drive using the Google Drive API. It supports both basic and resumable uploads, allowing you to efficiently upload large files in chunks. You
 
-## Dependencies
+## Google Drive API Documentation
 
 This class relies on the Google API PHP client library and requires a Google service account with the Google Drive API enabled. Please refer to the following resources for additional information and setup instructions:
 
@@ -12,7 +12,7 @@ This class relies on the Google API PHP client library and requires a Google ser
 
 ## Setting up Google Drive API Service Account
 
-To use the LogsheetReader Google Drive Uploader, you need to set up a Google Cloud Console service account and obtain the necessary credentials. Follow these steps:
+To use the Google Drive Uploader, you need to set up a Google Cloud Console service account and obtain the necessary credentials. Follow these steps:
 
 1. Create a Google Cloud project: [Google Cloud Console](https://console.cloud.google.com/projectcreate)
 2. Enable the Google Drive API: [Google Workspace Product Library](https://console.cloud.google.com/marketplace/product/google/drive.googleapis.com)
