@@ -1,6 +1,6 @@
 # Google Drive Uploader
 
-The Google Drive Uploader is a PHP class that facilitates uploading files to Google Drive using the Google Drive API. It supports both basic and resumable uploads, allowing you to efficiently upload large files in chunks. You
+Google Drive Uploader is a PHP class that simplifies uploading files to Google Drive using the Google Drive API. It supports basic and resumable uploads, allowing you to efficiently upload large files in chunks with options for asynchronous programming.
 
 ## Google Drive API Documentation
 
@@ -79,6 +79,8 @@ $uploader->startResumable($filePath);
 
 ### Asynchronous Resumable Upload
 
+To perform an aysnchronous upload, use the resumable upload method.
+
 ```php
 $uploader = new GoogleDriveUploader($driveFolderId);
 $resumeUri = $uploader->initResumable($fileName, $mimeType);
@@ -86,9 +88,9 @@ $resumeUri = $uploader->initResumable($fileName, $mimeType);
 $asyncTask = $uploader->startResumable($filePath, null, true);
 
 foreach ($asyncTask as $response) {
-    // Continue any other logic
+    // perform other logic
+    // you can abort the upload at any time by calling $uploader->abort()
     // $response will return false until the upload is complete
-    // You can abort the upload at any time by calling $uploader->abort()
 }
 
 // Once the upload is complete, $response will contain a Google Drive File object
