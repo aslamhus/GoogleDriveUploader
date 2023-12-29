@@ -6,6 +6,10 @@ use Google\Client;
 use Google\Service\Drive;
 use Google\Service\Drive\DriveFile;
 use Google\Http\MediaFileUpload;
+use Aslamhus\GoogleDrive\CurlRequest;
+use Aslamhus\GoogleDrive\CurlResponse;
+use Aslamhus\GoogleDrive\Exceptions\GoogleDriveUploaderException;
+use Aslamhus\GoogleDrive\Exceptions\GoogleDriveUploaderResumeException;
 
 /**
  * Google Drive Uploader
@@ -61,7 +65,7 @@ use Google\Http\MediaFileUpload;
 
 class GoogleDriveUploader
 {
-    private Client $client;
+    private ?Client $client;
     private Drive $driveService;
     private string $driveFolderId;
     private int $chunkSize;
@@ -76,8 +80,10 @@ class GoogleDriveUploader
      * @param string $driveFolderId
      * @param [int] $chunkSize - the chunk size for chunk uploads, defaults to Google recommended chunk size 262144
      */
-    public function __construct(string $driveFolderId, int $chunkSize = self::CHUNK_SIZE)
+    public function __construct(string $driveFolderId, int $chunkSize = self::CHUNK_SIZE, Client $client = null)
     {
+        $this->client = $client;
+        // set the drive folder id
         $this->driveFolderId = $driveFolderId;
         // set the chunk size for chunk uploads
         $this->chunkSize =  $chunkSize;
@@ -112,18 +118,22 @@ class GoogleDriveUploader
      * Init drive service
      *
      * Initializes the google drive service with the service account credentials
-     * The service account credentials must be stored in the environment variable GOOGLE_APPLICATION_CREDENTIALS
+     * If a client is passed in the constructor, it will be used instead.
+     * Otherwise, the service account credentials must be stored in the environment variable GOOGLE_APPLICATION_CREDENTIALS
      *
-     * @example
+     * ```php
      * putenv('GOOGLE_APPLICATION_CREDENTIALS=' . $myServiceAccountCredentials);
+     * ```
      *
      * @return void
      */
     private function initDriveService()
     {
-        $this->client = new Client();
-        $this->client->useApplicationDefaultCredentials();
-        $this->client->addScope(Drive::DRIVE);
+        if(!$this->client) {
+            $this->client = new Client();
+            $this->client->useApplicationDefaultCredentials();
+            $this->client->addScope(Drive::DRIVE);
+        }
         $this->driveService = new Drive($this->client);
     }
 
@@ -212,17 +222,15 @@ class GoogleDriveUploader
      * chunk sent to the google drive api.
      * An asyc upload may be aborted by calling the abort() method
      *
-     * @example
-     *
+     * ## Example
+     * ```php
      * // Note: The resume URI is stored after initResumable(), and can be accessed with getResumeUri() after resumableUpload() is called
      * $uploader = new DriveUploader($driveFolderId);
      * $resumeUri = $uploader->initResumable($fileName, $mimeType);
      * $uploader->startResumable($filePath, $mimeType);
-     *
      * // at this point, if the upload is interrupted, you can resume it with the resume() method
      * $uploader->resume($resumeUri);
-     *
-     *
+     * ```
      *
      * @param string $filePath - the path to the file to upload
      * @param ?callable $onChunkRead - a callback function that will be called on each chunk read
@@ -367,15 +375,20 @@ class GoogleDriveUploader
       * @param string $filePath - the path to the file to upload
       * @param callable [$onChunkRead]- a callback function that will be called on each chunk read
       * @param boolean [$async] - whether to upload asynchronously
-      * @return  Generator<DriveFile|false> - yields false for incomplete uploads and the DriveFile object for complete uploads
+      * @return  Generator<DriveFile|false|DriveFile|false - if async is set to true, returns a generator that will
+      * yield false for incomplete uploads and the DriveFile object for complete uploads. If async is set to false,
+      * returns the final response, which will be false for incomplete uploads and the DriveFile object for complete uploads
       *
       * @throws GoogleDriveUploaderException
       */
-    public function resume(string $resumeUri, string $filePath, callable $onChunkRead = null, bool $async = false)
+    public function resume(string $resumeUri, string $filePath, callable $onChunkRead = null, bool $async = false): Generator|DriveFile|false
     {
-        $response = false;
+
         // perform a curl PUT request to the resume uri
-        list($output, $status) = $this->queryResumableUri($resumeUri);
+        $curlResponse = $this->queryResumableUri($resumeUri);
+        // get the response and status code
+        $status = $curlResponse->getStatus();
+        $output = $curlResponse->getOutput();
         switch($status) {
             case 308:
                 /**
@@ -394,19 +407,20 @@ class GoogleDriveUploader
                 // upload is complete, no resume necessary
                 return true;
             case 400:
-                throw new GoogleDriveUploaderException('Bad request. Http status: ' . $status . '. Details:' . $output);
+                throw new GoogleDriveUploaderResumeException('Bad request', [$output, $status]);
+
 
             case 404:
             case 410:
             case 500:
             case 503:
                 // upload did not start, failed or resume uri expired, you must restart
-                throw new GoogleDriveUploaderException('Upload has not started, you must restart. Http status: ' . $status);
+                throw new GoogleDriveUploaderResumeException('Upload has not started, you must restart.', [$output, $status]);
 
 
         }
         // return the response
-        return $response;
+        return false;
 
     }
 
@@ -417,8 +431,7 @@ class GoogleDriveUploader
      * Interrupts the upload (if it is in progress)
      * Only works for resumable uploads.
      *
-     * @example
-     *
+     * ```php
      * $uploader = new DriveUploader($driveFolderId);
      * $resumeUri = $uploader->initResumable($fileName, $mimeType);
      * $asyncTask = $uploader->startResumable($filePath, $mimeType);
@@ -428,7 +441,7 @@ class GoogleDriveUploader
      *       $uploader->abort();
      *   }
      * }
-     *
+     * ```
      *
      * @param string $resumeUri
      * @return void
@@ -451,19 +464,20 @@ class GoogleDriveUploader
      * @param integer $status
      * @param boolean $async - whether to upload asynchronously (default is false)
      *
-     * @return Generator<?DriveFile> - yields false for incomplete uploads and the DriveFile object for complete uploads
+     * @return Generator<DriveFile|false>|DriveFile|false - if async is set to true, returns a generator that will
+      * yield false for incomplete uploads and the DriveFile object for complete uploads. If async is set to false,
+      * returns the final response, which will be false for incomplete uploads and the DriveFile object for complete uploads
      */
-    private function putRemainingChunks(string $resumeUri, string $filePath, array $byteRange, callable $onChunkRead, &$status, bool $async = false)
+    private function putRemainingChunks(string $resumeUri, string $filePath, array $byteRange, callable $onChunkRead, &$status, bool $async = false): Generator|DriveFile|false
     {
         $response = false;
 
         $fileSize = filesize($filePath);
         $bytesPointer = $byteRange[1] + 1;
-
+        // if async is set to true, return the generator
         if($async === true) {
             return $this->putRemainingChunksAsync($resumeUri, $filePath, $fileSize, $bytesPointer, $onChunkRead, $status);
         }
-
         // if async is set to false, return the final response
         $response = null;
         foreach($this->readChunks($filePath, $fileSize, $onChunkRead, $bytesPointer) as $chunkArgs) {
@@ -485,7 +499,7 @@ class GoogleDriveUploader
      * @param integer $bytesPointer
      * @param callable $onChunkRead
      * @param integer $status
-     * @return void
+     * @return Generator<DriveFile|false> - yields false for incomplete uploads and the DriveFile object for complete uploads
      */
     private function putRemainingChunksAsync(string $resumeUri, string $filePath, int $fileSize, int $bytesPointer, callable $onChunkRead, &$status)
     {
@@ -507,22 +521,25 @@ class GoogleDriveUploader
      * @param callable $onChunkRead
      * @param integer $status
      *
-     * @return Drive\DriveFile|false
+     * @return DriveFile|false
      */
     private function processRemainingChunk(string $resumeUri, array $chunkArgs, callable $onChunkRead, &$status)
     {
         list($chunk, $progress, $fileSize, $byteRange) = $chunkArgs;
         // sends a PUT request to the resume uri with the chunk
-        list($status, $response) = $this->resumePutChunk($chunk, $progress, $fileSize, $byteRange, $resumeUri);
+        $curlResponse = $this->resumePutChunk($chunk, $progress, $fileSize, $byteRange, $resumeUri);
+        // get the response and status code
+        $output = $curlResponse->getOutput();
+        $status = $curlResponse->getStatus();
         // validate the put request status
-        // note, chunk status will return 308 until the final chunk which should return 200
+        // Note: chunk status will return 308 until the final chunk which should return 200
         if($status != 202 && $status != 200 && $status != 308) {
             throw new GoogleDriveUploaderException("chunk upload failed with status: " . $status);
         }
         // fire the onChunkRead callback
         call_user_func($onChunkRead, $chunk, $progress, $fileSize, $byteRange);
         // parse the response
-        $response = $this->parseChunkResponse($response);
+        $response = $this->parseChunkResponse($output);
 
         return $response;
     }
@@ -564,12 +581,11 @@ class GoogleDriveUploader
      * Include a Content-Range header to indicate which portion of the file you send.
      * For example, Content-Range: bytes 43-1999999 indicates that you send bytes 44 through 2,000,000."
      *
-     * @return void
+     * @return CurlResponse - the cURL output and the http status code
      */
-    private function resumePutChunk($chunk, $progress, $fileSize, $byteRange, $resumeUri)
+    private function resumePutChunk($chunk, $progress, $fileSize, $byteRange, $resumeUri): CurlResponse
     {
-
-        $cH = curl_init();
+        // create the cURL request
         $chunkLength = strlen($chunk);
         $options = [
             CURLOPT_URL => $resumeUri,
@@ -586,17 +602,7 @@ class GoogleDriveUploader
             ),
             CURLOPT_POSTFIELDS => $chunk
         ];
-        curl_setopt_array($cH, $options);
-        // execute
-        $output = curl_exec($cH);
-        if($output === false) {
-            $error = curl_error($cH);
-            throw new GoogleDriveUploaderException($error);
-        }
-        $status = curl_getinfo($cH, CURLINFO_HTTP_CODE);
-        curl_close($cH);
-        return [$status, $output];
-
+        return CurlRequest::exec($options);
 
     }
 
@@ -622,11 +628,11 @@ class GoogleDriveUploader
      *
      *
      * @param string $resumeUri
-     * @return array - [ $output, $status ] - the cURL output and the http status code
+     * @return CurlResponse
      */
-    private function queryResumableUri(string $resumeUri): array
+    private function queryResumableUri(string $resumeUri): CurlResponse
     {
-        $cH = curl_init();
+
         $options = [
             CURLOPT_URL => $resumeUri,
             CURLOPT_PUT => true,
@@ -635,12 +641,7 @@ class GoogleDriveUploader
                 'Content-Range' => "*/*"
             ]
         ];
-        curl_setopt_array($cH, $options);
-        // execute
-        $output = curl_exec($cH);
-        $status = curl_getinfo($cH, CURLINFO_HTTP_CODE);
-        curl_close($cH);
-        return [ $output, $status];
+        return CurlRequest::exec($options);
     }
 
     /**
@@ -660,16 +661,5 @@ class GoogleDriveUploader
             }
         }
         return $byteRange;
-    }
-}
-
-
-class GoogleDriveUploaderException extends \Exception
-{
-    public function __construct(string $message, int $code = 0, \Throwable $previous = null)
-    {
-        $message = self::class . ": $message";
-        parent::__construct($message, $code, $previous);
-
     }
 }

@@ -56,6 +56,7 @@ class GoogleDriveUploaderTest extends TestCase
         echo "resuming upload... \n";
         // you could also make resume async, but for this test we will make it synchronous
         $file = $uploader->resume($resumeUri, TEST_FILE, 'onChunkRead');
+        var_dump($file);
         $this->assertTrue(isset($file['id']));
     }
 }
