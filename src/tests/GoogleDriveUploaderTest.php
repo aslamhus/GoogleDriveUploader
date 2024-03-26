@@ -4,6 +4,8 @@ require_once __DIR__ . '/config.php';
 
 use PHPUnit\Framework\TestCase;
 use Aslamhus\GoogleDrive\GoogleDriveUploader;
+use Google\Client;
+use Google\Service\Drive;
 
 // Set the path to the service account's key file
 putenv('GOOGLE_APPLICATION_CREDENTIALS=' . $_ENV['GOOGLE_APPLICATION_CREDENTIALS']);
@@ -15,6 +17,23 @@ class GoogleDriveUploaderTest extends TestCase
     public function testBasicUpload()
     {
         $uploader = new GoogleDriveUploader(DRIVE_FOLDER_ID);
+        $file = $uploader->uploadBasic(TEST_FILE, 'test-basic-upload.mp4', 'video/mp4');
+        $this->assertTrue(isset($file['id']));
+    }
+
+    public function testClientInjection()
+    {
+        // custom client with refresh token using the google oauth playground
+        $client = new Client();
+        $client->setAuthConfig($_ENV['GOOGLE_DELEGATE_APPLICATION_CREDENTIALS']);
+        $client->setClientId($_ENV['GOOGLE_DELEGATE_CLIENT_ID']);
+        $client->setRedirectUri('https://developers.google.com/oauthplayground');
+        $client->setAccessType('offline');
+        $token = $_ENV['REFRESH_TOKEN_PATH'];
+        $client->setAccessToken(json_decode(file_get_contents($token), true));
+        $client->addScope(Drive::DRIVE);
+        // inject the custom client
+        $uploader = new GoogleDriveUploader(DRIVE_FOLDER_ID, $client);
         $file = $uploader->uploadBasic(TEST_FILE, 'test-basic-upload.mp4', 'video/mp4');
         $this->assertTrue(isset($file['id']));
     }
@@ -37,6 +56,9 @@ class GoogleDriveUploaderTest extends TestCase
         // define on chunk read callback
         function onChunkRead($chunk, $progress, $fileSize, $byteRange)
         {
+            // for real time progress printed to the console, flush the output buffer
+            ob_flush();
+            flush();
             echo "progress: $progress% \n";
         }
         // upload file async

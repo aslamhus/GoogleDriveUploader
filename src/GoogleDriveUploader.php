@@ -15,11 +15,11 @@ use Aslamhus\GoogleDrive\Exceptions\GoogleDriveUploaderResumeException;
  * Google Drive Uploader
  * v1.0.0
  *
+ *
  * by @aslamhus
  *
  * For further documentation @see https://github.com/aslamhus/GoogleDriveUploader.git
  * or the README.md file
- *
  *
  * ### Basic upload
  * ```php
@@ -59,8 +59,6 @@ use Aslamhus\GoogleDrive\Exceptions\GoogleDriveUploaderResumeException;
  * // at this point, if the upload is interrupted, you can resume it with the resume() method
  * $uploader->resume($resumeUri);
  * ```
- *
- *
  */
 
 class GoogleDriveUploader
@@ -78,9 +76,10 @@ class GoogleDriveUploader
      * Constructor
      *
      * @param string $driveFolderId
+     * @param Client [$client] - the google client object (by default, the service account credentials are used)
      * @param [int] $chunkSize - the chunk size for chunk uploads, defaults to Google recommended chunk size 262144
      */
-    public function __construct(string $driveFolderId, int $chunkSize = self::CHUNK_SIZE, Client $client = null)
+    public function __construct(string $driveFolderId, Client $client = null, int $chunkSize = self::CHUNK_SIZE)
     {
         $this->client = $client;
         // set the drive folder id
